@@ -1,0 +1,64 @@
+BROKER SCHEMA com.accenture.afpi.genericloggingframework
+
+/**
+* Copyright 2015 Accenture. All Rights Reserved. Accenture Confidential and
+* Proprietary.
+* 
+* Disclosure and use of this source code is governed by contract with
+* Accenture. Any open source or third party source code referenced in this
+* source code is governed by their respective license terms.
+*/
+
+DECLARE Log4jPropertiesFile	EXTERNAL CHARACTER 'Log4j';
+
+-------------------------------------------------------------------------------------------------------------------
+/* Procedure Call to log message using Log4j Logging Framework */
+-------------------------------------------------------------------------------------------------------------------
+
+CREATE PROCEDURE messageLoggging(IN logMessage CHARACTER, IN logLevel CHARACTER)
+BEGIN
+
+     /* Variable Declaration */
+	DECLARE rc,rc1 BOOLEAN FALSE;
+	DECLARE logMsg CHARACTER;
+		
+	/* Call to intialize Log4j Logging Framework from UDP*/
+	CALL initLog4j(Log4jPropertiesFile) INTO rc;
+
+	/* Message logging for different log levels */
+	IF (logLevel IN ('DEBUG','INFO','WARNING','ERROR','FATAL')) THEN
+		SET logMsg = '<LOG4J_LOGGING><LOG4J_LEVEL>'|| COALESCE (logLevel, 'NA') ||'</LOG4J_LEVEL><MESSAGE>'|| COALESCE (logMessage, 'NA') ||'</MESSAGE><SERVICE>'|| COALESCE (MessageFlowLabel, 'NA') ||'</SERVICE><TIMESTAMP>'|| CAST (CURRENT_TIMESTAMP AS CHARACTER) ||'</TIMESTAMP></LOG4J_LOGGING>';
+		
+		IF (rc = TRUE) THEN
+			/* Call to perform logging during successful Log4j initialization */
+			CALL log4j(MessageFlowLabel, logLevel,logMsg) INTO rc1;
+		END IF;
+
+		
+		IF ( rc1 = FALSE ) THEN
+			/* Call to handle Error during Log4j initialization or log4j logging fails */
+			CALL log4j_1_1(MessageFlowLabel, logLevel, NodeLabel, logMsg) INTO rc;
+		END IF;
+
+	END IF;
+
+END;
+
+-------------------------------------------------------------------------------------------------------------------
+/* Procedure declaration to invoke java methods for Log4j Logging Framework */
+-------------------------------------------------------------------------------------------------------------------
+
+CREATE FUNCTION initLog4j( IN CONFIG_FILE_NAME CHARACTER )
+RETURNS BOOLEAN
+LANGUAGE JAVA
+EXTERNAL NAME "com.ibm.broker.IAM3.Log4jNode.initLog4j";
+
+CREATE FUNCTION log4j( IN COMPONENT_NAME CHARACTER, IN LEVEL CHARACTER, IN TEXT CHARACTER )
+RETURNS BOOLEAN
+LANGUAGE JAVA
+EXTERNAL NAME "com.ibm.broker.IAM3.Log4jNode.log";
+
+CREATE FUNCTION log4j_1_1( IN COMPONENT_NAME CHARACTER, IN LOGGER_NAME CHARACTER, IN LEVEL CHARACTER, IN TEXT CHARACTER )
+RETURNS BOOLEAN
+LANGUAGE JAVA
+EXTERNAL NAME "com.ibm.broker.IAM3.Log4jNode.log";
